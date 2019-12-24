@@ -1,0 +1,99 @@
+const gulp = require('gulp'),
+    sass = require('gulp-sass'),
+    sourcemaps = require('gulp-sourcemaps'),
+    rename = require('gulp-rename'),
+    cleancss = require('gulp-clean-css'),
+    autoprefixer = require('gulp-autoprefixer'),
+    size = require('gulp-size'),
+    changed = require('gulp-changed'),
+    browserSync = require('browser-sync').create(),
+    plumber = require('gulp-plumber'),
+    rigger = require('gulp-rigger'),
+    dir = { src: './assets/sass/', dist: './assets/css/' };
+
+const path = {
+    build: { 
+        html: './prod/',
+        css: dir.dist,
+    },
+    src: { 
+        html: [
+            './*.html',
+            './dev/*.html',
+        ], 
+        style: [
+            dir.src + '*.scss',
+            dir.src + '**/*.scss',
+            '!' + dir.src + '_*.scss',
+            '!' + dir.src + '**/_*.scss',
+        ], 
+    },
+    watch: { 
+        html: [
+            './*.html',
+            './dev/*.html',
+        ],
+        html_prod: [
+            './prod/*.html',
+        ],
+        style: [
+            dir.src + '*.scss',
+            dir.src + '**/*.scss',
+        ],
+    },
+};
+
+const config = {
+    server: {
+        baseDir: "./"
+    },
+    port: 8080,
+    open: true,
+    notify: true,
+    logLevel: 'silent',
+};
+
+gulp.task('browserSync', function() {
+    browserSync.init(config);
+});
+
+gulp.task('html:build', function(done) {
+    gulp.src(path.src.html) 
+        .pipe(plumber())
+        .pipe(rigger())
+        .pipe(gulp.dest(path.build.html))
+        .pipe(browserSync.reload({ stream: true }));
+    done();
+});
+
+gulp.task('style:build', function(done) {
+    return gulp.src(path.src.style)
+        .pipe(plumber())
+        .pipe(changed(dir.dist))
+        .pipe(sourcemaps.init())
+        .pipe(sass({ outputStyle: 'expanded' }).on('error', sass.logError))
+        .pipe(autoprefixer({ overrideBrowserslist: ['last 4 versions', '> .5%', 'ie 8', 'ie 7', 'iOS 7'] }))
+        .pipe(gulp.dest(dir.dist))
+
+        .pipe(cleancss())
+        .pipe(rename({ suffix: '.min' }))
+        .pipe(gulp.dest(dir.dist))
+
+        .pipe(sourcemaps.write('./', { includeContent: false, mapSources: false }))
+        .pipe(gulp.dest(dir.dist))
+
+        .pipe(browserSync.reload({ stream: true }))
+        .pipe(size());
+    done();
+});
+
+gulp.task('build', gulp.series('html:build', 'style:build'));
+
+gulp.task('watch', function() {
+    gulp.watch(path.watch.html, gulp.series('html:build'));
+    gulp.watch(path.watch.style, gulp.series('style:build'));
+
+    gulp.watch('./prod/*.html').on('change', browserSync.reload);
+});
+
+gulp.task('default', gulp.series('build', gulp.parallel('browserSync', 'watch')));
